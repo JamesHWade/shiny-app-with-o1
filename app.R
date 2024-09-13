@@ -4,15 +4,256 @@ library(bslib)
 library(ggplot2)
 library(dplyr)
 library(purrr)
+library(rlang)
 
-# Define UI
+# Define Distribution Metadata
+distributions <- list(
+  
+  # Continuous Distributions
+  continuous = list(
+    "Normal" = list(
+      params = list(
+        mean = list(default = 0, min = -Inf, max = Inf),
+        sd = list(default = 1, min = 0.01, max = Inf)
+      ),
+      support = c(-Inf, Inf),
+      description = "The normal distribution is a continuous probability distribution characterized by a symmetric, bell-shaped curve. It is defined by two parameters: the mean (μ) and the standard deviation (σ).",
+      examples = c(
+        "Measurement Errors: Modeling random measurement errors in laboratory experiments, such as variations in repeated measurements of a chemical concentration using the same instrument.",
+        "Biological Variations: Representing natural variations in biological characteristics, like human heights or blood pressure readings within a population.",
+        "Quality Control: Analyzing product dimensions in manufacturing processes to ensure they meet specified tolerances, assuming the dimensions are normally distributed around a target value."
+      )
+    ),
+    
+    "Beta" = list(
+      params = list(
+        shape1 = list(default = 2, min = 0.01, max = Inf),
+        shape2 = list(default = 2, min = 0.01, max = Inf)
+      ),
+      support = c(0, 1),
+      description = "The beta distribution is a continuous probability distribution defined on the interval [0,1], characterized by two shape parameters (α and β). It is flexible and can model various shapes including uniform, U-shaped, or skewed distributions.",
+      examples = c(
+        "Proportions in Mixtures: Modeling the proportion of a component in a chemical mixture when the proportion is between 0 and 1.",
+        "Success Rates: Representing the probability of success in a series of experiments, such as the efficacy rate of a new drug in clinical trials.",
+        "Reliability Analysis: Estimating the probability that a system will perform within acceptable limits, especially when probabilities are constrained between 0 and 1."
+      )
+    ),
+    
+    "Gamma" = list(
+      params = list(
+        shape = list(default = 2, min = 0.01, max = Inf),
+        rate = list(default = 1, min = 0.01, max = Inf)
+      ),
+      support = c(0, Inf),
+      description = "The gamma distribution is a two-parameter family of continuous probability distributions, often used to model waiting times or lifetimes of events. It is defined by a shape parameter (k) and a rate parameter (θ).",
+      examples = c(
+        "Waiting Times: Modeling the time until an event occurs, such as the time between emissions of particles in radioactive decay.",
+        "Insurance Claims: Representing the distribution of claim amounts in actuarial science, where the amounts are always positive and can vary widely.",
+        "Rainfall Modeling: Analyzing the amount of rainfall accumulated in a reservoir over a certain period, which is continuous and positively skewed."
+      )
+    ),
+    
+    "Uniform" = list(
+      params = list(
+        min = list(default = 0, min = -Inf, max = Inf),
+        max = list(default = 1, min = -Inf, max = Inf)
+      ),
+      support = c(-Inf, Inf),
+      description = "The uniform distribution is a continuous probability distribution where all outcomes are equally likely within a defined interval [a, b].",
+      examples = c(
+        "Random Sampling: Simulating a scenario where any outcome within a range is equally likely, such as selecting a random point within a square area.",
+        "Scheduling: Modeling arrival times within a fixed interval when any time is equally probable, like customers arriving at a store between opening and closing times.",
+        "Random Number Generation: Generating random numbers for simulations where each number within a range has an equal chance of being selected."
+      )
+    ),
+    
+    "Exponential" = list(
+      params = list(
+        rate = list(default = 1, min = 0.01, max = Inf)
+      ),
+      support = c(0, Inf),
+      description = "The exponential distribution is a continuous probability distribution often associated with the time between independent events occurring at a constant average rate. It is characterized by a single rate parameter (λ).",
+      examples = c(
+        "Time Between Events: Modeling the time between independent events that occur at a constant average rate, such as the time between incoming calls at a call center.",
+        "Reliability Engineering: Representing the lifespan of electronic components that have a constant failure rate over time.",
+        "Queue Theory: Analyzing service times in queuing systems where the probability of service completion is memoryless."
+      )
+    ),
+    
+    "Student's t" = list(
+      params = list(
+        df = list(default = 5, min = 1, max = Inf)
+      ),
+      support = c(-Inf, Inf),
+      description = "The Student's t-distribution is a continuous probability distribution that arises when estimating the mean of a normally distributed population in situations where the sample size is small. It is characterized by degrees of freedom parameter.",
+      examples = c(
+        "Small Sample Inference: Estimating the mean of a normally distributed population when the sample size is small and population standard deviation is unknown.",
+        "Confidence Intervals: Constructing confidence intervals for the mean in small-sample experiments, such as pilot studies.",
+        "Hypothesis Testing: Performing t-tests to compare means between two small independent samples in experimental research."
+      )
+    ),
+    
+    "Cauchy" = list(
+      params = list(
+        location = list(default = 0, min = -Inf, max = Inf),
+        scale = list(default = 1, min = 0.01, max = Inf)
+      ),
+      support = c(-Inf, Inf),
+      description = "The Cauchy distribution is a continuous probability distribution with heavy tails and undefined mean and variance. It is characterized by a location parameter and a scale parameter.",
+      examples = c(
+        "Resonance Behavior: Modeling resonance phenomena in physics, such as the distribution of energy in a resonant system.",
+        "Signal Processing: Representing the distribution of phase noise in oscillators where extreme values are more probable than in a normal distribution.",
+        "Financial Returns: Analyzing asset returns that may have heavy tails and outliers, which the normal distribution may not capture effectively."
+      )
+    ),
+    
+    "Weibull" = list(
+      params = list(
+        shape = list(default = 2, min = 0.01, max = Inf),
+        scale = list(default = 1, min = 0.01, max = Inf)
+      ),
+      support = c(0, Inf),
+      description = "The Weibull distribution is a continuous probability distribution used extensively in reliability engineering and failure analysis. It is characterized by a shape parameter and a scale parameter.",
+      examples = c(
+        "Material Strength: Modeling the breaking strength of materials under stress testing in engineering.",
+        "Failure Times: Representing the distribution of failure times in reliability studies of mechanical components.",
+        "Wind Speed Analysis: Analyzing wind speed data for wind energy assessments, as wind speeds often follow a Weibull distribution."
+      )
+    ),
+    
+    "Laplace" = list(
+      params = list(
+        location = list(default = 0, min = -Inf, max = Inf),
+        scale = list(default = 1, min = 0.01, max = Inf)
+      ),
+      support = c(-Inf, Inf),
+      description = "The Laplace distribution, also known as the double exponential distribution, is a continuous probability distribution with a sharp peak at the mean and heavy tails. It is characterized by a location parameter and a scale parameter.",
+      examples = c(
+        "Econometrics: Modeling financial returns that exhibit sharp peaks and heavy tails compared to the normal distribution.",
+        "Image Processing: Representing differences in pixel intensities in image edge detection algorithms.",
+        "Error Modeling: Analyzing error terms in time series data that may have abrupt changes or jumps."
+      )
+    ),
+    
+    "Logistic" = list(
+      params = list(
+        location = list(default = 0, min = -Inf, max = Inf),
+        scale = list(default = 1, min = 0.01, max = Inf)
+      ),
+      support = c(-Inf, Inf),
+      description = "The logistic distribution is similar to the normal distribution but has heavier tails. It is often used in logistic regression and neural networks. It is characterized by a location parameter and a scale parameter.",
+      examples = c(
+        "Growth Models: Modeling population growth in biology where growth accelerates rapidly and then slows down as it approaches a maximum limit.",
+        "Logistic Regression: Serving as the underlying distribution in logistic regression models for binary classification problems.",
+        "Psychometrics: Analyzing response times in cognitive tests where the probability of a correct response follows a logistic function over time."
+      )
+    )
+  ),
+  
+  # Discrete Distributions
+  discrete = list(
+    "Poisson" = list(
+      params = list(
+        lambda = list(default = 1, min = 0, max = Inf)
+      ),
+      support = c(0, Inf),
+      description = "The Poisson distribution is a discrete probability distribution expressing the probability of a given number of events occurring in a fixed interval of time or space, given a known average rate of occurrence.",
+      examples = c(
+        "Event Counts: Counting the number of occurrences of an event in a fixed interval, such as the number of mutations in a strand of DNA per unit length.",
+        "Astronomy: Modeling the number of stars observed in a fixed area of the sky during telescope observations.",
+        "Traffic Flow: Analyzing the number of cars passing through a checkpoint in a fixed time period."
+      )
+    ),
+    
+    "Binomial" = list(
+      params = list(
+        size = list(default = 10, min = 1, max = Inf),
+        prob = list(default = 0.5, min = 0, max = 1)
+      ),
+      support = c(0, Inf),
+      description = "The binomial distribution is a discrete probability distribution of the number of successes in a sequence of n independent experiments, each asking a yes-no question, and each with its own boolean-valued outcome.",
+      examples = c(
+        "Quality Testing: Determining the number of defective items in a batch of products when each item has a fixed probability of being defective.",
+        "Clinical Trials: Modeling the number of patients who experience a side effect in a drug trial.",
+        "Survey Analysis: Calculating the number of favorable responses in a survey where respondents answer 'yes' or 'no'."
+      )
+    ),
+    
+    "Negative Binomial" = list(
+      params = list(
+        size = list(default = 5, min = 1, max = Inf),
+        prob = list(default = 0.5, min = 0, max = 1)
+      ),
+      support = c(0, Inf),
+      description = "The negative binomial distribution is a discrete probability distribution that models the number of failures before a specified number of successes occurs. It generalizes the geometric distribution.",
+      examples = c(
+        "Overdispersed Counts: Modeling count data with variance greater than the mean, such as the number of disease occurrences in epidemiology studies.",
+        "Ecology Studies: Analyzing the number of species observed in ecological sampling when the occurrence is clustered.",
+        "Quality Control: Representing the number of defective items found before a certain number of acceptable items are produced."
+      )
+    )
+  )
+)
+
+# Helper Functions
+
+# Function to generate parameter inputs
+generate_param_inputs <- function(distribution, distributions_list) {
+  category <- ifelse(distribution %in% names(distributions_list$continuous), "continuous", "discrete")
+  params <- distributions_list[[category]][[distribution]]$params
+  
+  # Create a list of numericInput UI elements
+  inputs <- map(names(params), function(param_name) {
+    param_info <- params[[param_name]]
+    numericInput(
+      inputId = param_name,
+      label = param_name,
+      value = param_info$default,
+      min = param_info$min,
+      max = param_info$max
+    )
+  })
+  
+  # Return the UI elements as a tagList using the !!! operator for splicing
+  tagList(!!!inputs)
+}
+
+# Function to calculate density/probability
+calculate_density <- function(distribution, params, x_values) {
+  switch(distribution,
+         "Normal" = dnorm(x_values, mean = params$mean, sd = params$sd),
+         "Beta" = dbeta(x_values, shape1 = params$shape1, shape2 = params$shape2),
+         "Gamma" = dgamma(x_values, shape = params$shape, rate = params$rate),
+         "Uniform" = dunif(x_values, min = params$min, max = params$max),
+         "Exponential" = dexp(x_values, rate = params$rate),
+         "Poisson" = dpois(x_values, lambda = params$lambda),
+         "Binomial" = dbinom(x_values, size = params$size, prob = params$prob),
+         "Negative Binomial" = dnbinom(x_values, size = params$size, prob = params$prob),
+         "Student's t" = dt(x_values, df = params$df),
+         "Cauchy" = dcauchy(x_values, location = params$location, scale = params$scale),
+         "Weibull" = dweibull(x_values, shape = params$shape, scale = params$scale),
+         "Laplace" = {
+           # Laplace distribution (double exponential)
+           mu <- params$location
+           b <- params$scale
+           (1 / (2 * b)) * exp(-abs(x_values - mu) / b)
+         },
+         "Logistic" = dlogis(x_values, location = params$location, scale = params$scale),
+         NA
+  )
+}
+
+# Define Shiny UI
 ui <- page_sidebar(
-  theme = bs_theme(preset = "minty"), # Use Minty theme from bslib
+  theme = bs_theme(preset = "minty"),
   title = "Distribution Explorer",
   sidebar = sidebar(
     selectInput("distribution", "Select Distribution:",
-                choices = c("Normal", "Beta", "Gamma", "Uniform", "Exponential", "Poisson", "Binomial",
-                            "Student's t", "Cauchy", "Weibull", "Laplace", "Logistic", "Negative Binomial")),
+                choices = c(
+                  "Normal", "Beta", "Gamma", "Uniform", "Exponential", 
+                  "Poisson", "Binomial", "Student's t", "Cauchy", 
+                  "Weibull", "Laplace", "Logistic", "Negative Binomial"
+                )),
     uiOutput("parameterInputs")
   ),
   card(
@@ -25,302 +266,112 @@ ui <- page_sidebar(
       htmlOutput("distDescription")
     ),
     card(
-      card_header("Example in Chemistry R&D at Dow"),
-      htmlOutput("distExample")
+      card_header("Examples in Scientific Research"),
+      htmlOutput("distExamples")
     )
   )
 )
 
-# Define Server
+# Define Shiny Server
 server <- function(input, output, session) {
   
-  # Define parameters, descriptions, and examples for each distribution
-  # Distribution Parameters with Descriptions and Examples
-  distributionParams <- list(
-    "Normal" = list(
-      params = list(
-        "mean" = list("default" = 0, "min" = -Inf, "max" = Inf),
-        "sd" = list("default" = 1, "min" = 0.01, "max" = Inf)
-      ),
-      support = c(-Inf, Inf),
-      description = "The normal distribution is a continuous probability distribution characterized by a symmetric, bell-shaped curve. It is defined by two parameters: the mean (μ) and the standard deviation (σ).",
-      example = "<ul>
-                 <li><strong>Measurement Errors:</strong> Modeling random measurement errors in laboratory experiments, such as variations in repeated measurements of a chemical concentration using the same instrument.</li>
-                 <li><strong>Biological Variations:</strong> Representing natural variations in biological characteristics, like human heights or blood pressure readings within a population.</li>
-                 <li><strong>Quality Control:</strong> Analyzing product dimensions in manufacturing processes to ensure they meet specified tolerances, assuming the dimensions are normally distributed around a target value.</li>
-               </ul>"
-    ),
-    
-    "Beta" = list(
-      params = list(
-        "shape1" = list("default" = 2, "min" = 0.01, "max" = Inf),
-        "shape2" = list("default" = 2, "min" = 0.01, "max" = Inf)
-      ),
-      support = c(0, 1),
-      description = "The beta distribution is a continuous probability distribution defined on the interval [0,1], characterized by two shape parameters (α and β). It is flexible and can model various shapes including uniform, U-shaped, or skewed distributions.",
-      example = "<ul>
-                 <li><strong>Proportions in Mixtures:</strong> Modeling the proportion of a component in a chemical mixture when the proportion is between 0 and 1.</li>
-                 <li><strong>Success Rates:</strong> Representing the probability of success in a series of experiments, such as the efficacy rate of a new drug in clinical trials.</li>
-                 <li><strong>Reliability Analysis:</strong> Estimating the probability that a system will perform within acceptable limits, especially when probabilities are constrained between 0 and 1.</li>
-               </ul>"
-    ),
-    
-    "Gamma" = list(
-      params = list(
-        "shape" = list("default" = 2, "min" = 0.01, "max" = Inf),
-        "rate" = list("default" = 1, "min" = 0.01, "max" = Inf)
-      ),
-      support = c(0, Inf),
-      description = "The gamma distribution is a two-parameter family of continuous probability distributions, often used to model waiting times or lifetimes of events. It is defined by a shape parameter (k) and a rate parameter (θ).",
-      example = "<ul>
-                 <li><strong>Waiting Times:</strong> Modeling the time until an event occurs, such as the time between emissions of particles in radioactive decay.</li>
-                 <li><strong>Insurance Claims:</strong> Representing the distribution of claim amounts in actuarial science, where the amounts are always positive and can vary widely.</li>
-                 <li><strong>Rainfall Modeling:</strong> Analyzing the amount of rainfall accumulated in a reservoir over a certain period, which is continuous and positively skewed.</li>
-               </ul>"
-    ),
-    
-    "Uniform" = list(
-      params = list(
-        "min" = list("default" = 0, "min" = -Inf, "max" = Inf),
-        "max" = list("default" = 1, "min" = -Inf, "max" = Inf)
-      ),
-      support = c(-Inf, Inf),
-      description = "The uniform distribution is a continuous probability distribution where all outcomes are equally likely within a defined interval [a, b].",
-      example = "<ul>
-                 <li><strong>Random Sampling:</strong> Simulating a scenario where any outcome within a range is equally likely, such as selecting a random point within a square area.</li>
-                 <li><strong>Scheduling:</strong> Modeling arrival times within a fixed interval when any time is equally probable, like customers arriving at a store between opening and closing times.</li>
-                 <li><strong>Random Number Generation:</strong> Generating random numbers for simulations where each number within a range has an equal chance of being selected.</li>
-               </ul>"
-    ),
-    
-    "Exponential" = list(
-      params = list(
-        "rate" = list("default" = 1, "min" = 0.01, "max" = Inf)
-      ),
-      support = c(0, Inf),
-      description = "The exponential distribution is a continuous probability distribution often associated with the time between independent events occurring at a constant average rate. It is characterized by a single rate parameter (λ).",
-      example = "<ul>
-                 <li><strong>Time Between Events:</strong> Modeling the time between independent events that occur at a constant average rate, such as the time between incoming calls at a call center.</li>
-                 <li><strong>Reliability Engineering:</strong> Representing the lifespan of electronic components that have a constant failure rate over time.</li>
-                 <li><strong>Queue Theory:</strong> Analyzing service times in queuing systems where the probability of service completion is memoryless.</li>
-               </ul>"
-    ),
-    
-    "Poisson" = list(
-      params = list(
-        "lambda" = list("default" = 1, "min" = 0, "max" = Inf)
-      ),
-      support = c(0, Inf),
-      description = "The Poisson distribution is a discrete probability distribution expressing the probability of a given number of events occurring in a fixed interval of time or space, given a known average rate of occurrence.",
-      example = "<ul>
-                 <li><strong>Event Counts:</strong> Counting the number of occurrences of an event in a fixed interval, such as the number of mutations in a strand of DNA per unit length.</li>
-                 <li><strong>Astronomy:</strong> Modeling the number of stars observed in a fixed area of the sky during telescope observations.</li>
-                 <li><strong>Traffic Flow:</strong> Analyzing the number of cars passing through a checkpoint in a fixed time period.</li>
-               </ul>"
-    ),
-    
-    "Binomial" = list(
-      params = list(
-        "size" = list("default" = 10, "min" = 1, "max" = Inf),
-        "prob" = list("default" = 0.5, "min" = 0, "max" = 1)
-      ),
-      support = c(0, Inf),
-      description = "The binomial distribution is a discrete probability distribution of the number of successes in a sequence of n independent experiments, each asking a yes-no question, and each with its own boolean-valued outcome.",
-      example = "<ul>
-                 <li><strong>Quality Testing:</strong> Determining the number of defective items in a batch of products when each item has a fixed probability of being defective.</li>
-                 <li><strong>Clinical Trials:</strong> Modeling the number of patients who experience a side effect in a drug trial.</li>
-                 <li><strong>Survey Analysis:</strong> Calculating the number of favorable responses in a survey where respondents answer 'yes' or 'no'.</li>
-               </ul>"
-    ),
-    
-    "Student's t" = list(
-      params = list(
-        "df" = list("default" = 5, "min" = 1, "max" = Inf)
-      ),
-      support = c(-Inf, Inf),
-      description = "The Student's t-distribution is a continuous probability distribution that arises when estimating the mean of a normally distributed population in situations where the sample size is small. It is characterized by degrees of freedom parameter.",
-      example = "<ul>
-                 <li><strong>Small Sample Inference:</strong> Estimating the mean of a normally distributed population when the sample size is small and population standard deviation is unknown.</li>
-                 <li><strong>Confidence Intervals:</strong> Constructing confidence intervals for the mean in small-sample experiments, such as pilot studies.</li>
-                 <li><strong>Hypothesis Testing:</strong> Performing t-tests to compare means between two small independent samples in experimental research.</li>
-               </ul>"
-    ),
-    
-    "Cauchy" = list(
-      params = list(
-        "location" = list("default" = 0, "min" = -Inf, "max" = Inf),
-        "scale" = list("default" = 1, "min" = 0.01, "max" = Inf)
-      ),
-      support = c(-Inf, Inf),
-      description = "The Cauchy distribution is a continuous probability distribution with heavy tails and undefined mean and variance. It is characterized by a location parameter and a scale parameter.",
-      example = "<ul>
-                 <li><strong>Resonance Behavior:</strong> Modeling resonance phenomena in physics, such as the distribution of energy in a resonant system.</li>
-                 <li><strong>Signal Processing:</strong> Representing the distribution of phase noise in oscillators where extreme values are more probable than in a normal distribution.</li>
-                 <li><strong>Financial Returns:</strong> Analyzing asset returns that may have heavy tails and outliers, which the normal distribution may not capture effectively.</li>
-               </ul>"
-    ),
-    
-    "Weibull" = list(
-      params = list(
-        "shape" = list("default" = 2, "min" = 0.01, "max" = Inf),
-        "scale" = list("default" = 1, "min" = 0.01, "max" = Inf)
-      ),
-      support = c(0, Inf),
-      description = "The Weibull distribution is a continuous probability distribution used extensively in reliability engineering and failure analysis. It is characterized by a shape parameter and a scale parameter.",
-      example = "<ul>
-                 <li><strong>Material Strength:</strong> Modeling the breaking strength of materials under stress testing in engineering.</li>
-                 <li><strong>Failure Times:</strong> Representing the distribution of failure times in reliability studies of mechanical components.</li>
-                 <li><strong>Wind Speed Analysis:</strong> Analyzing wind speed data for wind energy assessments, as wind speeds often follow a Weibull distribution.</li>
-               </ul>"
-    ),
-    
-    "Laplace" = list(
-      params = list(
-        "location" = list("default" = 0, "min" = -Inf, "max" = Inf),
-        "scale" = list("default" = 1, "min" = 0.01, "max" = Inf)
-      ),
-      support = c(-Inf, Inf),
-      description = "The Laplace distribution, also known as the double exponential distribution, is a continuous probability distribution with a sharp peak at the mean and heavy tails. It is characterized by a location parameter and a scale parameter.",
-      example = "<ul>
-                 <li><strong>Econometrics:</strong> Modeling financial returns that exhibit sharp peaks and heavy tails compared to the normal distribution.</li>
-                 <li><strong>Image Processing:</strong> Representing differences in pixel intensities in image edge detection algorithms.</li>
-                 <li><strong>Error Modeling:</strong> Analyzing error terms in time series data that may have abrupt changes or jumps.</li>
-               </ul>"
-    ),
-    
-    "Logistic" = list(
-      params = list(
-        "location" = list("default" = 0, "min" = -Inf, "max" = Inf),
-        "scale" = list("default" = 1, "min" = 0.01, "max" = Inf)
-      ),
-      support = c(-Inf, Inf),
-      description = "The logistic distribution is similar to the normal distribution but has heavier tails. It is often used in logistic regression and neural networks. It is characterized by a location parameter and a scale parameter.",
-      example = "<ul>
-                 <li><strong>Growth Models:</strong> Modeling population growth in biology where growth accelerates rapidly and then slows down as it approaches a maximum limit.</li>
-                 <li><strong>Logistic Regression:</strong> Serving as the underlying distribution in logistic regression models for binary classification problems.</li>
-                 <li><strong>Psychometrics:</strong> Analyzing response times in cognitive tests where the probability of a correct response follows a logistic function over time.</li>
-               </ul>"
-    ),
-    
-    "Negative Binomial" = list(
-      params = list(
-        "size" = list("default" = 5, "min" = 1, "max" = Inf),
-        "prob" = list("default" = 0.5, "min" = 0, "max" = 1)
-      ),
-      support = c(0, Inf),
-      description = "The negative binomial distribution is a discrete probability distribution that models the number of failures before a specified number of successes occurs. It generalizes the geometric distribution.",
-      example = "<ul>
-                 <li><strong>Overdispersed Counts:</strong> Modeling count data with variance greater than the mean, such as the number of disease occurrences in epidemiology studies.</li>
-                 <li><strong>Ecology Studies:</strong> Analyzing the number of species observed in ecological sampling when the occurrence is clustered.</li>
-                 <li><strong>Quality Control:</strong> Representing the number of defective items found before a certain number of acceptable items are produced.</li>
-               </ul>"
-    )
-  )
+  # Reactive expression for selected distribution
+  selected_dist <- reactive({
+    req(input$distribution)
+    input$distribution
+  })
   
-  # Generate parameter inputs dynamically
+  # Dynamically generate parameter inputs
   output$parameterInputs <- renderUI({
-    dist_name <- input$distribution
-    params <- distributionParams[[dist_name]]$params
-    inputs <- map(names(params), function(param_name) {
-      param_info <- params[[param_name]]
-      numericInput(param_name, label = param_name,
-                   value = param_info$default,
-                   min = param_info$min,
-                   max = param_info$max)
-    })
-    do.call(tagList, inputs)
+    generate_param_inputs(selected_dist(), distributions)
   })
   
   # Render the distribution plot using ggplot2
   output$distPlot <- renderPlot({
-    dist_name <- input$distribution
-    params <- distributionParams[[dist_name]]$params
-    dist_params <- map_dbl(names(params), ~ input[[.x]])
-    names(dist_params) <- names(params) # Ensure names are preserved
+    req(selected_dist())
+    distribution <- selected_dist()
     
-    # Define the support and generate x values
-    support <- distributionParams[[dist_name]]$support
+    # Determine category
+    category <- ifelse(distribution %in% names(distributions$continuous), "continuous", "discrete")
+    
+    # Extract parameters
+    params_def <- distributions[[category]][[distribution]]$params
+    param_values <- map(names(params_def), ~ input[[.x]]) %>% 
+      set_names(names(params_def))
+    
+    # Define support and adjust x range
+    support <- distributions[[category]][[distribution]]$support
     xmin <- ifelse(is.infinite(support[1]), -10, support[1])
     xmax <- ifelse(is.infinite(support[2]), 10, support[2])
     
     # Adjust x range for specific distributions
-    if (dist_name == "Gamma") {
-      xmax <- max(10, qgamma(0.999, shape = dist_params[["shape"]], rate = dist_params[["rate"]]))
-    } else if (dist_name == "Exponential") {
-      xmax <- max(10, qexp(0.999, rate = dist_params[["rate"]]))
-    } else if (dist_name == "Poisson") {
-      xmax <- max(10, qpois(0.999, lambda = dist_params[["lambda"]]))
-    } else if (dist_name == "Weibull") {
-      xmax <- max(10, qweibull(0.999, shape = dist_params[["shape"]], scale = dist_params[["scale"]]))
-    } else if (dist_name == "Negative Binomial") {
-      xmax <- max(10, qnbinom(0.999, size = dist_params[["size"]], prob = dist_params[["prob"]]))
+    if (distribution == "Gamma") {
+      xmax <- max(10, qgamma(0.999, shape = param_values$shape, rate = param_values$rate))
+    } else if (distribution == "Exponential") {
+      xmax <- max(10, qexp(0.999, rate = param_values$rate))
+    } else if (distribution == "Poisson") {
+      xmax <- max(10, qpois(0.999, lambda = param_values$lambda))
+    } else if (distribution == "Weibull") {
+      xmax <- max(10, qweibull(0.999, shape = param_values$shape, scale = param_values$scale))
+    } else if (distribution == "Negative Binomial") {
+      xmax <- max(10, qnbinom(0.999, size = param_values$size, prob = param_values$prob))
     }
     
-    # Generate x values within the support
-    if (dist_name == "Beta") {
-      x <- seq(0, 1, length.out = 1000)
-    } else if (dist_name %in% c("Gamma", "Exponential", "Weibull")) {
-      x <- seq(max(0, xmin), xmax, length.out = 1000)
-    } else if (dist_name %in% c("Poisson", "Binomial", "Negative Binomial")) {
-      x <- 0:xmax
-    } else {
-      x <- seq(xmin, xmax, length.out = 1000)
+    # Generate x values within support
+    if (category == "continuous") {
+      if (distribution == "Beta") {
+        x <- seq(0, 1, length.out = 1000)
+      } else if (distribution %in% c("Gamma", "Exponential", "Weibull", "Logistic", "Laplace")) {
+        x <- seq(max(0, xmin), xmax, length.out = 1000)
+      } else {
+        x <- seq(xmin, xmax, length.out = 1000)
+      }
+    } else if (category == "discrete") {
+      x <- 0:ceiling(xmax)
     }
     
-    # Calculate the density or probability values
-    y <- switch(dist_name,
-                "Normal" = dnorm(x, mean = dist_params[["mean"]], sd = dist_params[["sd"]]),
-                "Beta" = dbeta(x, shape1 = dist_params[["shape1"]], shape2 = dist_params[["shape2"]]),
-                "Gamma" = dgamma(x, shape = dist_params[["shape"]], rate = dist_params[["rate"]]),
-                "Uniform" = dunif(x, min = dist_params[["min"]], max = dist_params[["max"]]),
-                "Exponential" = dexp(x, rate = dist_params[["rate"]]),
-                "Poisson" = dpois(x, lambda = dist_params[["lambda"]]),
-                "Binomial" = dbinom(x, size = dist_params[["size"]], prob = dist_params[["prob"]]),
-                "Student's t" = dt(x, df = dist_params[["df"]]),
-                "Cauchy" = dcauchy(x, location = dist_params[["location"]], scale = dist_params[["scale"]]),
-                "Weibull" = dweibull(x, shape = dist_params[["shape"]], scale = dist_params[["scale"]]),
-                "Laplace" = {
-                  # Laplace distribution (double exponential)
-                  mu <- dist_params[["location"]]
-                  b <- dist_params[["scale"]]
-                  (1 / (2 * b)) * exp(-abs(x - mu) / b)
-                },
-                "Logistic" = dlogis(x, location = dist_params[["location"]], scale = dist_params[["scale"]]),
-                "Negative Binomial" = dnbinom(x, size = dist_params[["size"]], prob = dist_params[["prob"]])
-    )
+    # Calculate density or probability
+    y <- calculate_density(distribution, param_values, x)
     
-    # Remove NA or infinite values
-    data <- data.frame(x = x, y = y)
-    data <- data %>% filter(is.finite(y))
+    # Create data frame and clean data
+    data <- data.frame(x = x, y = y) %>% 
+      filter(is.finite(y))
     
     # Plot using ggplot2
-    discrete_distributions <- c("Poisson", "Binomial", "Negative Binomial")
-    if (dist_name %in% discrete_distributions) {
+    if (category == "discrete") {
       ggplot(data, aes(x = x, y = y)) +
         geom_col(fill = "blue") +
-        labs(title = paste(dist_name, "Distribution"), x = "x", y = "Probability") +
-        theme_minimal(base_size = 16)
+        labs(title = paste(distribution, "Distribution"), x = "x", y = "Probability") +
+        theme_minimal()
     } else {
       ggplot(data, aes(x = x, y = y)) +
         geom_line(color = "blue") +
-        labs(title = paste(dist_name, "Distribution"), x = "x", y = "Density") +
-        theme_minimal(base_size = 16)
+        labs(title = paste(distribution, "Distribution"), x = "x", y = "Density") +
+        theme_minimal()
     }
+    
   })
   
   # Output the distribution description
   output$distDescription <- renderUI({
-    dist_name <- input$distribution
-    HTML(paste("<p>", distributionParams[[dist_name]]$description, "</p>"))
+    req(selected_dist())
+    distribution <- selected_dist()
+    category <- ifelse(distribution %in% names(distributions$continuous), "continuous", "discrete")
+    HTML(paste("<p>", distributions[[category]][[distribution]]$description, "</p>"))
   })
   
-  # Output the distribution example
-  output$distExample <- renderUI({
-    dist_name <- input$distribution
-    HTML(paste("<p>", distributionParams[[dist_name]]$example, "</p>"))
+  # Output the distribution examples
+  output$distExamples <- renderUI({
+    req(selected_dist())
+    distribution <- selected_dist()
+    category <- ifelse(distribution %in% names(distributions$continuous), "continuous", "discrete")
+    examples <- distributions[[category]][[distribution]]$examples
+    # Format as unordered list
+    html_examples <- paste0("<ul>", paste0("<li>", examples, "</li>"), "</ul>")
+    HTML(html_examples)
   })
+  
 }
-
 
 # Run the Shiny app
 shinyApp(ui = ui, server = server)
